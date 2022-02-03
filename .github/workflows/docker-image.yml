@@ -29,5 +29,5 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ariang:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:latest
