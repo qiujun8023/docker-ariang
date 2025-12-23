@@ -1,0 +1,69 @@
+name: Auto Update AriaNg Docker Image
+
+on:
+  schedule:
+    # 每天 UTC 时间 0 点检查一次
+    - cron: "0 0 * * *"
+  workflow_dispatch: # 支持手动触发
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get latest AriaNg release version
+        id: ariang
+        run: |
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/mayswind/AriaNg/releases/latest | jq -r '.tag_name')
+          echo "version=${LATEST_VERSION}" >> $GITHUB_OUTPUT
+          echo "Latest AriaNg version: ${LATEST_VERSION}"
+
+      - name: Check if Docker image exists
+        id: check
+        run: |
+          VERSION=${{ steps.ariang.outputs.version }}
+          # 检查 Docker Hub 上是否已存在该版本的镜像
+          if curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/ariang/tags/${VERSION}" | jq -e '.name' > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image version ${VERSION} already exists on Docker Hub"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image version ${VERSION} not found, will build"
+          fi
+
+      - name: Download AriaNg
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION=${{ steps.ariang.outputs.version }}
+          mkdir -p ariang
+          curl -sL "https://github.com/mayswind/AriaNg/releases/download/${VERSION}/AriaNg-${VERSION}.zip" -o ariang.zip
+          unzip -q ariang.zip -d ariang
+          rm ariang.zip
+
+      - name: Set up QEMU
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:${{ steps.ariang.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:latest
