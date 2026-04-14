@@ -40,16 +40,6 @@ jobs:
             echo "Tag ${VERSION} not found, will build"
           fi
 
-      - name: Create tag
-        if: steps.check.outputs.exists == 'false'
-        env:
-          VERSION: ${{ steps.ariang.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${VERSION}" -m "Release ${VERSION}"
-          git push origin "${VERSION}"
-
       - name: Download AriaNg
         if: steps.check.outputs.exists == 'false'
         env:
@@ -87,3 +77,16 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ariang:${{ steps.ariang.outputs.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/ariang:latest
+
+      - name: Commit and tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.ariang.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "${VERSION}" > VERSION
+          git add VERSION
+          git commit -m "chore: update AriaNg to ${VERSION}"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin HEAD:master "${VERSION}"
