@@ -33,6 +33,15 @@ jobs:
             echo "Image version ${VERSION} not found, will build"
           fi
 
+      - name: Commit and tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION=${{ steps.ariang.outputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
+
       - name: Download AriaNg
         if: steps.check.outputs.exists == 'false'
         run: |
