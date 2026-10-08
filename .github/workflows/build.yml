@@ -83,3 +83,11 @@ jobs:
           git commit -m "chore: update AriaNg to ${VERSION}"
           git tag -a "${VERSION}" -m "Release ${VERSION}"
           git push origin HEAD:master "${VERSION}"
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/ariang
+          short-description: Docker image for AriaNg, synced with upstream releases daily
