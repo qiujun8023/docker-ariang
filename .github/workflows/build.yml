@@ -5,9 +5,15 @@ on:
     # Check daily at 00:00 UTC
     - cron: "0 0 * * *"
   workflow_dispatch: # Allow manual runs
+    inputs:
+      force:
+        description: Build even if nothing changed
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build:
@@ -25,7 +31,7 @@ jobs:
             https://api.github.com/repos/mayswind/AriaNg/releases/latest | jq -r '.tag_name')
           CURRENT=$(cat VERSION 2>/dev/null || echo "")
           echo "version=${LATEST}" >> $GITHUB_OUTPUT
-          if [ "${LATEST}" = "${CURRENT}" ]; then
+          if [ "${{ inputs.force }}" != "true" ] && [ "${LATEST}" = "${CURRENT}" ]; then
             echo "needed=false" >> $GITHUB_OUTPUT
             echo "Already up to date: ${LATEST}"
           else
@@ -51,12 +57,13 @@ jobs:
         if: steps.check.outputs.needed == 'true'
         uses: docker/setup-buildx-action@v4
 
-      - name: Login to DockerHub
+      - name: Login to GHCR
         if: steps.check.outputs.needed == 'true'
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         if: steps.check.outputs.needed == 'true'
@@ -68,8 +75,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:${{ steps.check.outputs.version }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/ariang:latest
+            ghcr.io/${{ github.repository_owner }}/ariang:${{ steps.check.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/ariang:latest
 
       - name: Commit and tag
         if: steps.check.outputs.needed == 'true'
@@ -78,16 +85,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # A forced build of the current version has nothing to commit or tag
+          [ "${VERSION}" = "$(cat VERSION 2>/dev/null)" ] && exit 0
           echo "${VERSION}" > VERSION
           git add VERSION
           git commit -m "chore: update AriaNg to ${VERSION}"
           git tag -a "${VERSION}" -m "Release ${VERSION}"
           git push origin HEAD:master "${VERSION}"
-
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v5
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/ariang
-          short-description: Docker image for AriaNg, synced with upstream releases daily
