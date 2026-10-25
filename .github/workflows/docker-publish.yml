@@ -56,10 +56,6 @@ jobs:
           unzip -q ariang.zip -d ariang
           rm ariang.zip
 
-      - name: Set up QEMU
-        if: steps.check.outputs.needed == 'true'
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         if: steps.check.outputs.needed == 'true'
         uses: docker/setup-buildx-action@v4
